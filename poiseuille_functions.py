@@ -1,7 +1,6 @@
 import math
 import numpy as np
 from scipy.sparse.linalg import spsolve
-# import scipy.sparse.linalg # these are for the sparse matrix solution, which isn't really used so comment out
 from scipy.sparse import coo_matrix
 
 

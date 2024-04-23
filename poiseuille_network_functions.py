@@ -1,7 +1,6 @@
 from itertools import combinations
 import numpy as np
 import networkx as nx
-import time
 from decimal import Decimal
 
 
@@ -258,8 +257,8 @@ def neighbour_nodes(edges):
     """
     node_pairs = []    
     for edge in edges:
-            edge_nodes = (edge[1], edge[2])
-            node_pairs.append(edge_nodes)
+        edge_nodes = (edge[1], edge[2])
+        node_pairs.append(edge_nodes)
     nodes_combin = combinations (node_pairs, 3)
     neighbours = []
     for nodes_triplet in nodes_combin:

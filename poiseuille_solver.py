@@ -4,6 +4,7 @@ import poiseuille_functions
 from poiseuille_class import PoiseuilleNetwork
 from argparse import ArgumentParser
 
+
 def sign(number):
     if number > 0:
         return 1
