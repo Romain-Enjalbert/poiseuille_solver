@@ -2,6 +2,7 @@ import poiseuille_network_functions
 import poiseuille_reader
 import poiseuille_functions
 from poiseuille_class import PoiseuilleNetwork
+import numpy as np
 from argparse import ArgumentParser
 
 
@@ -44,6 +45,8 @@ def main(polyline_path, bc_node_list, pressure_bc_list, h_bc_list, alpha=0.05):
         j_results.append(j); miu_results.append(current_miu); q_results.append(q);
         h_results.append(poiseuille_class.H); p_results.append(p); rbc_results.append(rbc_flux)
         poiseuille_class.Q = q; poiseuille_class.p = p
+        poiseuille_class.apparent_viscosity = current_miu
+        poiseuille_class.wss = [4.*mu*abs(flowrate) / (np.pi*r**3) for mu, flowrate, r in zip(poiseuille_class.apparent_viscosity, poiseuille_class.Q, poiseuille_class.radius)]
 
         print(iteration)
         iteration += 1

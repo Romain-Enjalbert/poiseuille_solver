@@ -57,6 +57,15 @@ process_inlets(self)
             a list containing the haematocrit at every edge, by edge index, before first iteration initialises at 0.2 everywhere, except at edges defined by h_inlets
         p_0 : list
             a list initialising the pressure values at every node at 0, except where the nodes are defined by iolets
+        p : list
+            a list cintaning the pressure values at every node after Poiseuille solution, by node index
+            doesn't exist upon initialisation but updated after each iteration
+        wss : list
+            a list containing the wall shear stress at every edge, by edge index, as per Fry et al. Microcirculation 2012, in SI units
+            doesn't exist upon initialisation but updated after each iteration
+        apparent_viscosity : list
+            a list containing the apparent viscosity at every edge, by edge index, as per Secomb 2017 annual review, in SI units
+            doesn't exist upon initialisation but updated after each iteration
         bifurcations : list
             a nested list containing [edge 1 #, edge 2 #, edge 3 #, central node #] at every entry, i.e. all three edges in the bifurcation and the central node to the bifurcation
         bifurcation_neighbour_nodes : list

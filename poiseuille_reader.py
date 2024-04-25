@@ -65,6 +65,14 @@ def write_to_vtk(poiseuille_class):
     absolute_flowrate_array.SetName('absolute_flowrate')
     polydata.GetCellData().AddArray(absolute_flowrate_array)
 
+    apparent_viscosity_array = numpy_support.numpy_to_vtk(poiseuille_class.apparent_viscosity)
+    apparent_viscosity_array.SetName('apparent_viscosity')
+    polydata.GetCellData().AddArray(apparent_viscosity_array)
+
+    wss_array = numpy_support.numpy_to_vtk(poiseuille_class.wss)
+    wss_array.SetName('wss')
+    polydata.GetCellData().AddArray(wss_array)
+
     haematocrit_array = numpy_support.numpy_to_vtk(poiseuille_class.H)
     haematocrit_array.SetName('haematocrit')
     polydata.GetCellData().AddArray(haematocrit_array)
@@ -76,7 +84,6 @@ def write_to_vtk(poiseuille_class):
     rbc_flux_array = numpy_support.numpy_to_vtk(rbc_flux)
     rbc_flux_array.SetName('rbc_flux')
     polydata.GetCellData().AddArray(rbc_flux_array)
-
 
     length_array = numpy_support.numpy_to_vtk(poiseuille_class.length)
     length_array.SetName('length')
