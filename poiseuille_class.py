@@ -7,27 +7,70 @@ from vtk.util import numpy_support
 
 class PoiseuilleNetwork(object):
     """
-    edges: at every entry contains [edge #, node 1 index, node 2 index] OK
-    radius: at every entry contains radius in m indexed by edges OK
-    D: at every entry contains diameter in um indexed by edges OK
-    h_inlets: every entry contains [edge #, h BC value (0 - 1. range)] OK
-    nodes: List (node_#, x_coord, y_coord) indexed by node number OK
-    iolets: Return list (node_#, pressure_bc) OK
-    BC: type of BC pressure or velocity, no longer used I think but would have been useful to still have
-    length: Length of each channel indexed by edge
-    H: initial hct values indexed by edge
-    p_0: pressure list with BCs and 0s everywhere else
-    bifurcations:
-    bifurcation_neighbour_nodes:
-    straights:
-    straight_neighbour_nodes:
-    """
+    A class representing a microvascular network
+
+    ...
+Methods
+----------
+read_polydata(self, polydata_path)
+    Read the polydata of the network into the class
+    The polydata contains the graph (edges, nodes) and the radius at every edge
+
+create_h_inlets(self, h_list, BC_nodes)
+    Creates the h_inlets for the instance attribute
+
+process_inlets(self)
+    Initiliases some of the instance attributes for the network class
+
+"""
+
     def __init__(self, polydata_path, BC_nodes, BC_p, BC_haematocrit):
+        """
+        Parameters
+        ----------
+        polydata_path : str
+            path to the .vtp network to create the class of the network
+        BC_nodes : list
+            a list containing the node indices that are boundary nodes
+        BC_p : list
+            a list containing the pressure value (pa) of the boundary nodes, indexed by BC_nodes list
+        BC_haematocrit :
+            a list containing the haematcrit [0,1.] at the boundary nodes, indexed by BC_nodes list
+
+        Attributes
+        ----------
+        edges : list
+            a nested list containing [edge #, node 1 index, node 2 index] at every entry
+        nodes : list
+            a nested list containing [node #, x_coord, y_coord, z_coord] at every entry
+        radius : list
+            a list containing the radius (in metres) at every entry, by edge index
+        D : list
+            a list containing the diameter (in um) at every entry, by edge index
+        iolets : list
+            a nested list containing [BC node index, pressure value of BC node in pa] at every entry
+        h_inlets : list
+            a nested list containing [BC edge index, haematocrit at index ranging from 0. to 1.] at every entry
+        length : list
+            a list containing the length of each edge (in metres) at every entry, by edge index
+        H : list
+            a list containing the haematocrit at every edge, by edge index, before first iteration initialises at 0.2 everywhere, except at edges defined by h_inlets
+        p_0 : list
+            a list initialising the pressure values at every node at 0, except where the nodes are defined by iolets
+        bifurcations : list
+            a nested list containing [edge 1 #, edge 2 #, edge 3 #, central node #] at every entry, i.e. all three edges in the bifurcation and the central node to the bifurcation
+        bifurcation_neighbour_nodes : list
+            a nested list containing np.array([central node #, neighbour  node 1 #, neighbour  node 2 #, neighbour  node 3 #]) at every entry, i.e. the central node to the bifurcation, and the three other nodes at the end of the edges
+        straights : list
+            a nested list containing [edge 1 #, edge 2 #, central node #] at every entry, i.e. the two edges in a straight and the central node
+        straight_neighbour_nodes : list
+            a nested list containing np.array([central node #, neighbour  node 1 #, neighbour  node 2 #]) at every entry, i.e. the central node to the straight, and the two other nodes at the end of the edges
+        """
         self.read_polydata(polydata_path)
         self.iolets = [[n, p] for n, p in zip(BC_nodes, BC_p)]
         self.create_h_inlets(BC_haematocrit, BC_nodes)
         self.process_inlets()
-        self.bifurcations, self.bifurcation_neighbour_nodes, self.straights, self.straight_neighbour_nodes = poiseuille_network_functions.new_process_network(self.edges, self.nodes)
+        self.bifurcations, self.bifurcation_neighbour_nodes, self.straights, self.straight_neighbour_nodes = poiseuille_network_functions.process_network(self.edges, self.nodes)
 
     def read_polydata(self, polydata_path):
         reader = vtk.vtkXMLPolyDataReader()

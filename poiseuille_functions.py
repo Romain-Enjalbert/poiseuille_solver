@@ -15,12 +15,9 @@ def logit(x):
 def solve_conductance(NetworkClass):
     """
     Generates conductance values based on Poiseuille equation and viscosity empirical relations from Secomb 2017 review
-    :param conductance_edges: (edge_no, node_1, node_2) list at every entry
-    :param conductance_r: list with all radii indexed by edge_no
-    :param conductance_d: list with all diameters indexed by edge_no
-    :param conductance_l: list with all lengths indexed by edge_no
-    :param conductance_H: list with all hct's indexed by edge_no
-    :return: list with conductance and viscosity, indexed by edge_no
+    :param NetworkClass: NetworkClass defined in poiseuille_class.py
+    :return conductance_list: a list containing the conductance at every edge, indexed by edge
+    :return viscosity_list: a list containing viscosity at every edge, indexed by edge
     """
     plasma_viscosity = 1.2*10**-3  # value from paper, Secomb 2017 (Pa s)
     conductance_list = []
@@ -40,51 +37,43 @@ def solve_conductance(NetworkClass):
     return conductance_list, viscosity_list
 
 
-def generate_solve_poiseuille_matrix(network_class, conductance):
+def generate_solve_poiseuille_matrix(NetworkClass, conductance):
     """
-    Generates a zero matrix of number_nodes x number_nodes and populates it with the conductance and known pressure (BC) and solves for pressure
-    :param matrix_nodes: (node_number, x_coord, y_coord) at every row indexed by node number
-    :param bifurcations_list: (edge_1, edge_2, edge_3, central_node) at every row forming a bifurcation
-    :param bifurcations_neighbours: (central_node, node_1, node_2, node_3) at every row of a bifurcation
-    :param straights_list: (edge_1, edge_2, central_node) at every row of a straight
-    :param straights_neighbours: (central_node, node_1, node_2) at every row of a straight
-    :param conductance: List of conductances indexed by edge number
-    :param iolets: (node_number, pressure_BC) at every row
-    :param p_0: Current pressure list wih BCs already in place
-    :return: List of pressure values indexed by node number
+    Generates a zero matrix of number_nodes x number_nodes and populates it with the conductance and known pressure (BC), converts it to a sparse matrix, and solves for pressure
+    :param NetworkClass: NetworkClass defined in poiseuille_class.py
+    :param conductance: a list containing the conductance at every edge, indexed by edge, generated through solve_conductance
+    :return pressure_matrix: List of pressure values indexed by node number
     """
 
     row = []
     col = []
     data = []
-    for bifurcation, bifurcation_neighbours in zip(network_class.bifurcations, network_class.bifurcation_neighbour_nodes):
+    for bifurcation, bifurcation_neighbours in zip(NetworkClass.bifurcations, NetworkClass.bifurcation_neighbour_nodes):
         row.append(bifurcation[3]); col.append(bifurcation[3]); data.append(-(conductance[bifurcation[0]] + conductance[bifurcation[1]] + conductance[bifurcation[2]]))
         row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[1]); data.append(conductance[bifurcation[0]])
         row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[2]); data.append(conductance[bifurcation[1]])
         row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[3]); data.append(conductance[bifurcation[2]])
-    for straight, straight_neighbours in zip(network_class.straights, network_class.straight_neighbour_nodes):
+    for straight, straight_neighbours in zip(NetworkClass.straights, NetworkClass.straight_neighbour_nodes):
         row.append(straight[2]); col.append(straight[2]); data.append(-(conductance[straight[0]] + conductance[straight[1]]))
         row.append(straight_neighbours[0]); col.append(straight_neighbours[1]); data.append(conductance[straight[0]])
         row.append(straight_neighbours[0]); col.append(straight_neighbours[2]); data.append(conductance[straight[1]])
-    for nodes_iolets in network_class.iolets: #This imposes the BCs in the matrix so that it doesn't change BCs to an unknown to be solved should it be linked to a straight/bifurcation
+    for nodes_iolets in NetworkClass.iolets: #This imposes the BCs in the matrix so that it doesn't change BCs to an unknown to be solved should it be linked to a straight/bifurcation
         row.append(nodes_iolets[0]), col.append(nodes_iolets[0]), data.append(1)
 
-    matrix_size = len(network_class.nodes)
-
+    matrix_size = len(NetworkClass.nodes)
     sparse_matrix = coo_matrix((data, (row, col)), shape=(matrix_size, matrix_size)).tocsr() # this converts the matrix to another format scipy can solve, reason for ussing coo is that its easy for me...
-
-    pressure_matrix = spsolve(sparse_matrix, network_class.p_0)
+    pressure_matrix = spsolve(sparse_matrix, NetworkClass.p_0)
 
     return pressure_matrix
 
 
 def solve_flow(pressure_matrix, conductance, edges_list):
     """
-    Use available data to solve for flowrate through Poiseuille
-    :param pressure_matrix: Matrix containing pressure values indexed by node_number
-    :param conductance: List of conductances indexed by edge_number
-    :param edges_list: standard edges input (edge_no, node_0, node_1)
-    :return: Flowrates indexed by edge number
+    Use available data to solve for flowrate through Poiseuille's equation
+    :param pressure_matrix: Matrix containing pressure values indexed by node_number, generated through generate_solve_poiseuille_matrix
+    :param conductance: a list containing the conductance at every edge, indexed by edge, generated through solve_conductance
+    :param edges_list: a nested list containing [edge #, node 1, node 2] at every entry
+    :return flow_list: a list containing the flowrate at every edge, indexed by edge
     """
     flow_list = []
     for edge in edges_list:
@@ -93,25 +82,22 @@ def solve_flow(pressure_matrix, conductance, edges_list):
     return flow_list
 
 
-def solve_haematocrit(flowrates, network_class, diverging_bifurcations, converging_bifurcations, p_matrix):
+def solve_haematocrit(flowrates, NetworkClass, diverging_bifurcations, converging_bifurcations, p_matrix):
     """
-    Implements a mass balance for converging and straights. For diverging bifurcations, chooses which model to use and implements HCT split model
-    :param flowrates: Flowrates indexed by edges
-    :param h_list: Current hct indexed by edges
-    :param diameters: Diameter indexed by edges, not D is in um
-    :param diverging_bifurcations: (edge_1, edge_2, edge_3, central_node) in diverging bifurcations, edge_1 splits to 2 and 3
-    :param converging_bifurcations: (edge_1, edge_2, edge_3, central_node) in converging bifurcations edge_2 and 3 converge into 1
-    :param straight_bifurcations: (edge_1, edge_2, central_node) where there is no bifurcation
-    :param edges: List of edges
-    :param p_matrix: Pressure list indexed by node number
-    :param h_solver: Choice of string to determine whether to use Pries solver or our solver
-    :return: Returns the updated HCT list indexed by edge number
+    Implements a mass balance for converging and straights. For diverging bifurcations,
+    calculates child branch haematocrit according to Pries solver, see Secomb 2017 blood flow in microcirculation
+    :param flowrates: a list containing the flowrate at every edge, indexed by edge, generated through solve_flow
+    :param NetworkClass: NetworkClass defined in poiseuille_class.py
+    :param diverging_bifurcations: a list containing [edge 1, edge 2, edge 3, central_node] in diverging bifurcations, edge 1 bifurcates to 2 and 3
+    :param converging_bifurcations: a list contaning [edge_1, edge_2, edge_3, central_node] in converging bifurcations edge 2 and 3 converge into 1
+    :param p_matrix: a list of pressure values indexed by node number, generated through generate_solve_poiseuille_matrix
+    :return h_list: a list of haematocrit at every edge, indexed by edge number
     """
 
-    h_list = network_class.H
-    straight_bifurcations = network_class.straights
-    edges = network_class.edges
-    diameters = network_class.D
+    h_list = NetworkClass.H
+    straight_bifurcations = NetworkClass.straights
+    edges = NetworkClass.edges
+    diameters = NetworkClass.D
 
     descending_pressure_list = sorted(p_matrix, reverse=True)
     pressure_descending_index = [np.where(p_matrix == pressure)[0][0] for pressure in descending_pressure_list]
@@ -124,7 +110,6 @@ def solve_haematocrit(flowrates, network_class, diverging_bifurcations, convergi
             if abs(flowrates[straight[0]]) and abs(flowrates[straight[1]]) < 10 ** (-50):
                 h_list[straight[0]] = 0
                 h_list[straight[1]] = 0
-                # assert 0
 
             if p_matrix[edges[straight[0], 1]] >= p_matrix[edges[straight[0], 2]] and p_matrix[edges[straight[0], 1]] >= p_matrix[edges[straight[1], 1]] and p_matrix[edges[straight[0], 1]] >= p_matrix[edges[straight[1], 2]]:
                 h_list[straight[1]] = h_list[straight[0]]
@@ -141,14 +126,12 @@ def solve_haematocrit(flowrates, network_class, diverging_bifurcations, convergi
                 h_list[divergent[1]], h_list[divergent[2]] = pries_solver(flowrates[divergent[0]], flowrates[divergent[1]], flowrates[divergent[2]], h_list[divergent[0]], diameters[divergent[0]], diameters[divergent[1]], diameters[divergent[2]])
                 q_in = abs(flowrates[divergent[0]]) * h_list[divergent[0]]
                 q_out = abs(flowrates[divergent[1]]) * h_list[divergent[1]] + abs(flowrates[divergent[2]]) * h_list[divergent[2]]
-
                 if q_in != 0.:
                     assert 0.99999 < q_in / q_out < 1.00001, (q_in / q_out)
                 elif q_in == 0.:
                     assert q_in == q_out, (q_in, q_out)
                 else:
                     assert 0
-
         elif index in central_node_converging:
             convergent = converging_bifurcations[central_node_converging.index(index)]
             if abs(flowrates[convergent[0]]) < 10**(-50):
@@ -171,14 +154,15 @@ def solve_haematocrit(flowrates, network_class, diverging_bifurcations, convergi
 def pries_solver(q_0, q_1, q_2, h_0, d_0, d_1, d_2):
     """
     Implementation of the Pries model from Secomb 2017 review paper
-    :param q_0: flowrate of diverging branch
-    :param q_1: flowrate child branch 1
-    :param q_2: flowrate child rbanch 2
-    :param h_0: HCT parent branch
-    :param d_0: diameter parent branch in um
-    :param d_1: diameter child branch 1 in um
-    :param d_2: diameter child branch 2 in um
-    :return: HCT of the child branches
+    :param q_0: float, flowrate of parent (diverging) branch
+    :param q_1: float, flowrate child branch 1
+    :param q_2: float, flowrate child rbanch 2
+    :param h_0: float, haematocrit of parent branch
+    :param d_0: float, diameter parent branch in um
+    :param d_1: float, diameter child branch 1 in um
+    :param d_2: float, diameter child branch 2 in um
+    :return h_1: float, haematocrit in child branch 1
+    :return h_2: float, haematocrit in child branch 2
     """
     e = math.e
     FQB = abs(q_1 / q_0) # the absolute is necessary as the convention for flowrates can lead to a negative FQB, which is of course unphysical and doesn't give right results
@@ -200,111 +184,6 @@ def pries_solver(q_0, q_1, q_2, h_0, d_0, d_1, d_2):
     assert 1. > h_1 >= 0., (h_1, q_1, q_2, q_0)
     assert 1. > h_2 >= 0., (h_2, q_1, q_2, q_0)
     return h_1, h_2
-
-
-def check_converged(Q_results, error = 0.1):
-    """
-    Checks whether the current iteration has converged with the previous iteration
-    :param Q_results: List of flowrates lists indexed by iteration
-    :return: Boolean for whether solution has converged
-    """
-    converged = True
-    if len(Q_results) == 1:
-        converged = False
-    else:
-        current_Q = Q_results[-1]
-        previous_Q = Q_results[-2]
-        for count, (current, previous) in enumerate(zip(current_Q, previous_Q)):
-            if abs(current) == abs(previous):
-                pass
-            elif abs(current) - abs(previous) >= abs(current)*error/100.:
-                print(100.*(abs(current) - abs(previous)) / abs(current), current, previous, count, abs(current - previous))
-                converged = False
-                break
-    return converged
-
-
-def check_straights(Q, straights):
-    """
-    Checks that the straigh edges are conserving mass from a flowrate point of view
-    :param Q:
-    :param straights:
-    :return:
-    """
-    for straight in straights:
-        edge_1 = straight[0]
-        edge_2 = straight[1]
-        if abs(abs(Q[edge_1]) - abs(Q[edge_2])) > abs(Q[edge_1])*0.01/100:
-            return False
-    return True
-
-
-def check_converging(Q, convergings):
-    """
-    Check that the converging bifurcations are converging mass
-    :param Q:
-    :param convergings:
-    :return:
-    """
-    for converging in convergings:
-        inlet_1 = converging[1]
-        inlet_2 = converging[2]
-        outlet = converging[0]
-        Q_in = abs(Q[inlet_1]) + abs(Q[inlet_2])
-        Q_out = abs(Q[outlet])
-        if Q_in == Q_out:
-            return True
-        elif Q_in - Q_out >= Q_in*0.01/100:
-            return False
-    return True
-
-
-def check_diverging(Q, divergings):
-    """
-    Check that the diverging bifurcations are conserving mass
-    :param Q:
-    :param divergings:
-    :return:
-    """
-    for diverging in divergings:
-        inlet = diverging[0]
-        outlet_1 = diverging[1]
-        outlet_2 = diverging[2]
-        Q_in = abs(Q[inlet])
-        Q_out = abs(Q[outlet_1]) + abs(Q[outlet_2])
-        if Q_in == Q_out:
-            return True
-        elif Q_in - Q_out >= Q_in * 0.01 / 100:
-            return False
-    return True
-
-
-def check_flow_reversal(Q_current, Q_previous):
-    """
-
-    :param Q_current:
-    :param Q_previous:
-    :return:
-    """
-    for q_current, q_previous in zip(Q_current, Q_previous):
-        if q_current < 0.:
-            q_current = -1
-        elif q_current > 0.:
-            q_current = 1
-        else:
-            assert 0
-
-        if q_previous < 0.:
-            q_previous = -1
-        elif q_previous > 0.:
-            q_previous = 1
-        else:
-            assert 0
-
-        if q_previous != q_current:
-            return True
-
-    return False
 
 
 if __name__ == "__main__":
