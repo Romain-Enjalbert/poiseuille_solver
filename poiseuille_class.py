@@ -1,6 +1,4 @@
 import poiseuille_network_functions
-import poiseuille_reader
-import csv
 import numpy as np
 from scipy.spatial.distance import euclidean
 import vtk
@@ -24,9 +22,10 @@ class PoiseuilleNetwork(object):
     straights:
     straight_neighbour_nodes:
     """
-    def __init__(self, polydata_path, csv_iolets_path):
+    def __init__(self, polydata_path, BC_nodes, BC_p, BC_haematocrit):
         self.read_polydata(polydata_path)
-        self.read_csv_iolets(csv_iolets_path)
+        self.iolets = [[n, p] for n, p in zip(BC_nodes, BC_p)]
+        self.create_h_inlets(BC_haematocrit, BC_nodes)
         self.process_inlets()
         self.bifurcations, self.bifurcation_neighbour_nodes, self.straights, self.straight_neighbour_nodes = poiseuille_network_functions.new_process_network(self.edges, self.nodes)
 
@@ -57,17 +56,12 @@ class PoiseuilleNetwork(object):
         self.D = [2.*r for r in radius]
         return
 
-    def read_csv_iolets(self, csv_iolets):
+    def create_h_inlets(self, h_list, BC_nodes):
         self.h_inlets = []
-        self.iolets = []
-        with open(csv_iolets, 'r') as csv_file:
-            csv_reader = csv.reader(csv_file)
-            for row in csv_reader:
-                self.iolets.append([int(row[0]), float(row[1])])
-                for count, edge in enumerate(self.edges):
-                    if int(row[0]) == int(edge[1]) or int(row[0]) == int(edge[2]):
-                        self.h_inlets.append([count, float(row[2])])
-                        continue
+        for h, n in zip(h_list, BC_nodes):
+            for count, edge in enumerate(self.edges):
+                if n == int(edge[1]) or n == int(edge[2]):
+                    self.h_inlets.append([count, h])
         return
 
     def process_inlets(self):

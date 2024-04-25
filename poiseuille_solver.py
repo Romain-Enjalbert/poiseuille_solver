@@ -5,8 +5,8 @@ from poiseuille_class import PoiseuilleNetwork
 from argparse import ArgumentParser
 
 
-def main(polyline_path, iolets_path):
-    poiseuille_class = PoiseuilleNetwork(polyline_path, iolets_path)
+def main(polyline_path, nodelist, pressure_bc_list, h_bc_list):
+    poiseuille_class = PoiseuilleNetwork(polyline_path, nodelist, pressure_bc_list, h_bc_list)
 
     p_results, Q_results, H_results, miu_results, j_results, rbc_results = [], [], [], [], [], []
     solution_converged = False
@@ -67,4 +67,5 @@ if __name__ == "__main__":
     parser.add_argument('input_iolets', type=str, help='Input csv with iolets')
     args = parser.parse_args()
 
-    poiseuille_reader.write_to_vtk(main(args.input_polyline, args.input_iolets))
+    nodes, pressure, haematocrits = poiseuille_reader.read_iolets_csv(args.input_iolets)
+    poiseuille_reader.write_to_vtk(main(args.input_polyline, nodes, pressure, haematocrits))

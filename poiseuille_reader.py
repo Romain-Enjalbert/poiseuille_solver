@@ -1,5 +1,17 @@
+import csv
 import vtk
 from vtk.util import numpy_support
+
+
+def read_iolets_csv(iolets_path):
+    node_list, pressure_BC_list, h_BC_list = [], [], []
+    with open(iolets_path, 'r') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for row in csv_reader:
+            node_list.append(int(row[0]))
+            pressure_BC_list.append(float(row[1]))
+            h_BC_list.append(float(row[2]))
+    return node_list, pressure_BC_list, h_BC_list
 
 
 def create_points(array):
