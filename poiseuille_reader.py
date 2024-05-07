@@ -51,7 +51,7 @@ def write_to_vtk(poiseuille_class):
         segments.append([edge[1], edge[2]])
     points = []
     for node in poiseuille_class.nodes:
-        points.append([node[1], node[2], 0])
+        points.append([node[1], node[2], node[3]])
 
     polydata = vtk.vtkPolyData()
     polydata.SetPoints(create_points(points))
