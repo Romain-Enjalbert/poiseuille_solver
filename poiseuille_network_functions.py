@@ -228,7 +228,7 @@ def check_bifurcations(divergent_check, convergent_check, q_check, p_check, edge
     return True
 
 
-def check_converged(q_results, error=0.1):
+def check_converged(q_results, error=0.1, print_option=False):
     """
     Checks whether the current iteration has converged with the previous iteration
     :param q_results: a nested list with each entry containing a list with the flowrate at every edge for each iteration
@@ -245,7 +245,8 @@ def check_converged(q_results, error=0.1):
             if abs(current) == abs(previous):
                 pass
             elif abs(current) - abs(previous) >= abs(current)*error/100.:
-                print(100.*(abs(current) - abs(previous)) / abs(current), current, previous, count, abs(current - previous))
+                if print_option:
+                    print(100.*(abs(current) - abs(previous)) / abs(current), current, previous, count, abs(current - previous))
                 converged = False
                 break
     return converged
