@@ -31,7 +31,7 @@ def create_cells(array):
     return vtk_cells
 
 
-def write_to_vtk(poiseuille_class):
+def write_to_vtk(poiseuille_class, file_name):
     """
     Write result of the network simulation to VTK
     :param poiseuille_class: Contains all the data to write to disk
@@ -93,7 +93,6 @@ def write_to_vtk(poiseuille_class):
     pressure_array.SetName('pressure')
     polydata.GetPointData().AddArray(pressure_array)
 
-    file_name = 'poiseuille_vtk.vtp'
     writer = vtk.vtkXMLPolyDataWriter()
     writer.SetFileName(file_name)
     writer.SetInputData(polydata)

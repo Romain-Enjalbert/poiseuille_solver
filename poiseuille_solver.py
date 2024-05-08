@@ -58,4 +58,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     nodes, pressure, haematocrits = poiseuille_reader.read_iolets_csv(args.input_iolets)
-    poiseuille_reader.write_to_vtk(main(args.input_polyline, nodes, pressure, haematocrits, print_option=args.print_option))
+    poiseuille_reader.write_to_vtk(main(args.input_polyline, nodes, pressure, haematocrits, print_option=args.print_option), args.input_polyline.replace(".vtp", "_poiseuille.vtp"))
