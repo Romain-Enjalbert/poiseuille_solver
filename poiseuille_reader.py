@@ -35,6 +35,7 @@ def write_to_vtk(poiseuille_class, file_name):
     """
     Write result of the network simulation to VTK
     :param poiseuille_class: Contains all the data to write to disk
+    :param file_name: path and name to save the output to
     :return: No return, but saves a VTP file in current directory called 'poiseuille_vtk.vtp'
     """
     absolute_flowrate = []
