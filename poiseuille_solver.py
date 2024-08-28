@@ -6,19 +6,17 @@ import numpy as np
 from argparse import ArgumentParser
 
 
-def main(polyline_path, bc_node_list, pressure_bc_list, h_bc_list, alpha=0.05, print_option=False):
+def main(polyline_path, iolet_csv, alpha=0.05, print_option=False):
     """
     Main function, takes the network and boundary conditions and returns the solved flow/haematocrit/pressure in the network
     Uses Poiseuille's law for the flow, and Pries' empirical model for phase separation
     See Secomb 2017 annual review on blood flow in the microcirculation as a starting point
     :param polyline_path: VTK polyline of the network, each edge contains the radius under string "Radius"
-    :param bc_node_list: list of boundary nodes index values, [BC node 1 index, BC node 2 index .... , final BC node index]
-    :param pressure_bc_list: list of pressure at boundary nodes [pressure BC node 1, ... , pressure final BC node], same length as bc_node_list with matching index between the two
-    :param h_bc_list: list haematocrits at bounday nodes [haematocrit BC node 1, ..., haematocrit at final BC node], note haematocrit is defined at edge, so class finds edge corresponding to boundary node
+    :param iolet_csv: csv containing boundary node index, pressure, and hct information
     :param alpha: constant for predictor-corrector scheme, see Lorthois et al. NeuroImage 2011, part 1. Lower values lead to more stable solver but solver is then slower to converge
     :return: the PoiseuilleClass of solved network, containing pressure, flowrate, and haematocrits in the network
     """
-    poiseuille_class = PoiseuilleNetwork(polyline_path, bc_node_list, pressure_bc_list, h_bc_list)
+    poiseuille_class = PoiseuilleNetwork(polyline_path, *poiseuille_reader.read_iolets_csv(iolet_csv))
 
     solution_converged = False
     iteration = 1
@@ -57,5 +55,4 @@ if __name__ == "__main__":
     parser.add_argument('--print_option', type=int, help='Flag to print each iteration information in Poiseuille solver, argparse does not support a bool type, as it returns True for both True and False...', default=0, required=False, choices=[0, 1])
     args = parser.parse_args()
 
-    nodes, pressure, haematocrits = poiseuille_reader.read_iolets_csv(args.input_iolets)
-    poiseuille_reader.write_to_vtk(main(args.input_polyline, nodes, pressure, haematocrits, print_option=args.print_option), args.input_polyline.replace(".vtp", "_poiseuille.vtp"))
+    poiseuille_reader.write_to_vtk(main(args.input_polyline, args.input_iolets, print_option=args.print_option), args.input_polyline.replace(".vtp", "_poiseuille.vtp"))
