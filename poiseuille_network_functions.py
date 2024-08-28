@@ -307,5 +307,56 @@ def check_diverging(q, divergings):
     return True
 
 
+def check_flow_to_all_junctions_is_zero(poiseuille_class):
+    """
+    This checks that according to the solution, the flow to every junction is 0 (q1 + q2 +q3=0) based on notation in Fry
+    :param poiseuille_class: NetworkClass defined in poiseuille_class.py
+    :return: no return, just fails if not
+    """
+    for count, bifurcation in enumerate(poiseuille_class.bifurcations):
+        q1, q2, q3 = poiseuille_class.Q[bifurcation[0]], poiseuille_class.Q[bifurcation[1]], poiseuille_class.Q[bifurcation[2]]
+        bif_neigh = poiseuille_class.bifurcation_neighbour_nodes[count]
+        central = bif_neigh[0]
+        neigh1, neigh2, neigh3 = bif_neigh[1], bif_neigh[2], bif_neigh[3]
+        pressures = poiseuille_class.p
+        p_central = pressures[central]
+        p1, p2, p3 = pressures[neigh1], pressures[neigh2], pressures[neigh3]
+        if p1 > p_central:
+            l1 = 1.
+        else:
+            l1 = -1.
+        if p2 > p_central:
+            l2 = 1.
+        else:
+            l2 = -1.
+        if p3 > p_central:
+            l3 = 1.
+        else:
+            l3 = -1.
+        q1, q2, q3 = l1*abs(q1), l2*abs(q2), l3*abs(q3)
+        print(sum([q1, q2, q3]), q1, q2, q3)
+        assert abs(sum([q1, q2, q3])) < 10e-22
+    for count, straight in enumerate(poiseuille_class.straights):
+        q1, q2 = poiseuille_class.Q[straight[0]], poiseuille_class.Q[straight[1]]
+        bif_neigh = poiseuille_class.straight_neighbour_nodes[count]
+        central = bif_neigh[0]
+        neigh1, neigh2 = bif_neigh[1], bif_neigh[2]
+        pressures = poiseuille_class.p
+        p_central = pressures[central]
+        p1, p2 = pressures[neigh1], pressures[neigh2]
+        if p1 > p_central:
+            l1 = 1.
+        else:
+            l1 = -1.
+        if p2 > p_central:
+            l2 = 1.
+        else:
+            l2 = -1.
+        q1, q2 = l1*abs(q1), l2*abs(q2)
+        print(sum([q1, q2]), q1, q2)
+        assert abs(sum([q1, q2])) < 10e-22
+    return
+
+
 if __name__ == "__main__":
     pass

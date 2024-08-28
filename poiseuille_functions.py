@@ -1,7 +1,9 @@
 import math
 import numpy as np
+import scipy.linalg
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import coo_matrix
+from scipy.linalg import solve as solve_matrix
 
 
 def exp(x):
@@ -37,34 +39,74 @@ def solve_conductance(NetworkClass):
     return conductance_list, viscosity_list
 
 
-def generate_solve_poiseuille_matrix(NetworkClass, conductance):
+def generate_solve_poiseuille_matrix(NetworkClass, conductance, sparse=True):
     """
     Generates a zero matrix of number_nodes x number_nodes and populates it with the conductance and known pressure (BC), converts it to a sparse matrix, and solves for pressure
     :param NetworkClass: NetworkClass defined in poiseuille_class.py
     :param conductance: a list containing the conductance at every edge, indexed by edge, generated through solve_conductance
     :return pressure_matrix: List of pressure values indexed by node number
     """
+    if sparse:
+        row = []
+        col = []
+        data = []
+        for bifurcation, bifurcation_neighbours in zip(NetworkClass.bifurcations, NetworkClass.bifurcation_neighbour_nodes):
+            row.append(bifurcation[3]); col.append(bifurcation[3]); data.append(-(conductance[bifurcation[0]] + conductance[bifurcation[1]] + conductance[bifurcation[2]]))
+            row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[1]); data.append(conductance[bifurcation[0]])
+            row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[2]); data.append(conductance[bifurcation[1]])
+            row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[3]); data.append(conductance[bifurcation[2]])
+        for straight, straight_neighbours in zip(NetworkClass.straights, NetworkClass.straight_neighbour_nodes):
+            row.append(straight[2]); col.append(straight[2]); data.append(-(conductance[straight[0]] + conductance[straight[1]]))
+            row.append(straight_neighbours[0]); col.append(straight_neighbours[1]); data.append(conductance[straight[0]])
+            row.append(straight_neighbours[0]); col.append(straight_neighbours[2]); data.append(conductance[straight[1]])
+        for nodes_iolets in NetworkClass.iolets: #This imposes the BCs in the matrix so that it doesn't change BCs to an unknown to be solved should it be linked to a straight/bifurcation
+            row.append(nodes_iolets[0]), col.append(nodes_iolets[0]), data.append(1)
 
-    row = []
-    col = []
-    data = []
-    for bifurcation, bifurcation_neighbours in zip(NetworkClass.bifurcations, NetworkClass.bifurcation_neighbour_nodes):
-        row.append(bifurcation[3]); col.append(bifurcation[3]); data.append(-(conductance[bifurcation[0]] + conductance[bifurcation[1]] + conductance[bifurcation[2]]))
-        row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[1]); data.append(conductance[bifurcation[0]])
-        row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[2]); data.append(conductance[bifurcation[1]])
-        row.append(bifurcation_neighbours[0]); col.append(bifurcation_neighbours[3]); data.append(conductance[bifurcation[2]])
-    for straight, straight_neighbours in zip(NetworkClass.straights, NetworkClass.straight_neighbour_nodes):
-        row.append(straight[2]); col.append(straight[2]); data.append(-(conductance[straight[0]] + conductance[straight[1]]))
-        row.append(straight_neighbours[0]); col.append(straight_neighbours[1]); data.append(conductance[straight[0]])
-        row.append(straight_neighbours[0]); col.append(straight_neighbours[2]); data.append(conductance[straight[1]])
-    for nodes_iolets in NetworkClass.iolets: #This imposes the BCs in the matrix so that it doesn't change BCs to an unknown to be solved should it be linked to a straight/bifurcation
-        row.append(nodes_iolets[0]), col.append(nodes_iolets[0]), data.append(1)
-
-    matrix_size = len(NetworkClass.nodes)
-    sparse_matrix = coo_matrix((data, (row, col)), shape=(matrix_size, matrix_size)).tocsr() # this converts the matrix to another format scipy can solve, reason for ussing coo is that its easy for me...
-    pressure_matrix = spsolve(sparse_matrix, NetworkClass.p_0)
-
+        matrix_size = len(NetworkClass.nodes)
+        sparse_matrix = coo_matrix((data, (row, col)), shape=(matrix_size, matrix_size)).tocsr() # this converts the matrix to another format scipy can solve, reason for ussing coo is that its easy for me...
+        pressure_matrix = spsolve(sparse_matrix, NetworkClass.p_0)
+    else:
+        """The Fry formulation below leads to identical results to above, implementation is for reference for the Fry notation and to check how it works"""
+        """Above just bypasses several steps by pre-processing the network and getting the neighbour nodes, which yields the signs for M,L and not having to loop twice through all nodes"""
+        """Sparse matrix also makes the solver much quicker on much larger networks"""
+        matrix_K = np.zeros(shape=(len(NetworkClass.nodes), len(NetworkClass.nodes)))
+        for bifurcation_i in NetworkClass.nodes:  # Fry, for i in N
+            for bifurcation_k in NetworkClass.nodes:  # Fry, for k in N
+                for edge_j in NetworkClass.edges:  # Fry, for j in S
+                    edge_index = edge_j[0]
+                    node_i = bifurcation_i[0]
+                    node_k = bifurcation_k[0]
+                    Mjk = getMjk(node_k, edge_j) * conductance[edge_index]
+                    Lij = getLij(node_i, edge_j)
+                    matrix_K[node_i, node_k] += Mjk * Lij
+        for nodes_iolets in NetworkClass.iolets:  # this sets the boundary conditions with a 1 in the diagonal, so the pressure is known, the pressure is already in the NetworkClass.p0
+            matrix_K[nodes_iolets[0], nodes_iolets[0]] = 1
+        pressure_matrix = solve_matrix(matrix_K, NetworkClass.p_0)
     return pressure_matrix
+
+
+def getMjk(node_k, segment_j):
+    start_node_segment = segment_j[1]
+    end_node_segment = segment_j[2]
+    if node_k == start_node_segment:
+        M_jk = 1.
+    elif node_k == end_node_segment:
+        M_jk = -1.
+    else:
+        M_jk = 0.
+    return M_jk
+
+
+def getLij(node_i, segment_j):
+    start_node_segment = segment_j[1]
+    end_node_segment = segment_j[2]
+    if node_i == start_node_segment:
+        L_ij = -1
+    elif node_i == end_node_segment:
+        L_ij = 1
+    else:
+        L_ij = 0.
+    return L_ij
 
 
 def solve_flow(pressure_matrix, conductance, edges_list):
