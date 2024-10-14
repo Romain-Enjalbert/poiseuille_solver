@@ -2,16 +2,27 @@ import csv
 import vtk
 from vtk.util import numpy_support
 
+def read_target_csv(target_csv):
+    target = []
+    with open(target_csv, 'r') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for row in csv_reader:
+            target.append(float(row[1]))
+    return target
 
 def read_iolets_csv(iolets_path):
-    node_list, pressure_BC_list, h_BC_list = [], [], []
+    B_nodes_known, pressure_BC_list, h_BC_list, B_nodes_all, B_nodes_unkown = [], [], [], [], []
     with open(iolets_path, 'r') as csv_file:
         csv_reader = csv.reader(csv_file)
         for row in csv_reader:
-            node_list.append(int(row[0]))
-            pressure_BC_list.append(float(row[1]))
+            B_nodes_all.append(int(row[0]))
+            if float(row[1]) == -1.:
+                B_nodes_unkown.append(int(row[0]))
+            else:
+                B_nodes_known.append(int(row[0]))
+                pressure_BC_list.append(float(row[1]))
             h_BC_list.append(float(row[2]))
-    return node_list, pressure_BC_list, h_BC_list
+    return B_nodes_known, pressure_BC_list, h_BC_list, B_nodes_all, B_nodes_unkown
 
 
 def create_points(array):

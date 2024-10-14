@@ -15,6 +15,7 @@ def process_network(edges_in_network, nodes_in_network):
     :return network_straights_neighbour_nodes: [central_node, neighbour_node_1, neighbour_node_2] in every row
     """
     network_bifurcations, network_bifurcation_neighbour_nodes, network_straights, network_straights_neighbour_nodes = [], [], [], []
+    network_singles, network_single_neighbour_nodes = [], []
 
     G = nx.Graph()
     for node in nodes_in_network:
@@ -23,6 +24,16 @@ def process_network(edges_in_network, nodes_in_network):
         G.add_edge(int(edge[1]), int(edge[2]), index=count)
 
     for node in G.nodes():
+
+        """Added to get neighbour of degree 1 node"""
+
+        if G.degree(node) == 1:
+            central_node = int(node)
+            neighbour_node_1 = int(list(G.edges(node))[0][1])
+            edge_1 = G.get_edge_data(central_node, neighbour_node_1)["index"]
+            network_singles.append([edge_1, central_node])
+            network_single_neighbour_nodes.append(np.array([central_node, neighbour_node_1]))
+
         if G.degree(node) == 2:
             central_node = int(node)
             neighbour_node_1 = int(list(G.edges(node))[0][1])
@@ -71,7 +82,7 @@ def process_network(edges_in_network, nodes_in_network):
             network_bifurcations.append(bifurcation)
             network_bifurcation_neighbour_nodes.append(bifurcation_nodes)
 
-    return network_bifurcations, network_bifurcation_neighbour_nodes, network_straights, network_straights_neighbour_nodes
+    return network_bifurcations, network_bifurcation_neighbour_nodes, network_straights, network_straights_neighbour_nodes, network_singles, network_single_neighbour_nodes
 
 
 def bifurcation_types(Q, bifurcations, edges, p):
@@ -334,7 +345,7 @@ def check_flow_to_all_junctions_is_zero(poiseuille_class):
         else:
             l3 = -1.
         q1, q2, q3 = l1*abs(q1), l2*abs(q2), l3*abs(q3)
-        print(sum([q1, q2, q3]), q1, q2, q3)
+        # print(sum([q1, q2, q3]), q1, q2, q3)
         assert abs(sum([q1, q2, q3])) < 10e-22
     for count, straight in enumerate(poiseuille_class.straights):
         q1, q2 = poiseuille_class.Q[straight[0]], poiseuille_class.Q[straight[1]]
@@ -353,7 +364,7 @@ def check_flow_to_all_junctions_is_zero(poiseuille_class):
         else:
             l2 = -1.
         q1, q2 = l1*abs(q1), l2*abs(q2)
-        print(sum([q1, q2]), q1, q2)
+        # print(sum([q1, q2]), q1, q2)
         assert abs(sum([q1, q2])) < 10e-22
     return
 

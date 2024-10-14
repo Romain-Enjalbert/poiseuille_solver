@@ -24,18 +24,22 @@ process_inlets(self)
 
 """
 
-    def __init__(self, polydata_path, BC_nodes, BC_p, BC_haematocrit):
+    def __init__(self, polydata_path, known_BC_nodes, known_BC_p, BC_haematocrit, all_boundary_nodes, unknown_BC_nodes):
         """
         Parameters
         ----------
         polydata_path : str
             path to the .vtp network to create the class of the network
-        BC_nodes : list
-            a list containing the node indices that are boundary nodes
-        BC_p : list
-            a list containing the pressure value (pa) of the boundary nodes, indexed by BC_nodes list
+        known_BC_nodes : list
+            a list containing the node indices that are known BC boundary nodes
+        known_BC_p : list
+            a list containing the pressure value (pa) of the knwon BC boundary nodes, indexed by BC_nodes list
         BC_haematocrit :
             a list containing the haematcrit [0,1.] at the boundary nodes, indexed by BC_nodes list
+        all_boundary_nodes :
+            a list containing the node indices of all boundary nodes
+        unknown_BC_nodes :
+            a list containing the node indices of the unknown boundary nodes
 
         Attributes
         ----------
@@ -74,12 +78,22 @@ process_inlets(self)
             a nested list containing [edge 1 #, edge 2 #, central node #] at every entry, i.e. the two edges in a straight and the central node
         straight_neighbour_nodes : list
             a nested list containing np.array([central node #, neighbour  node 1 #, neighbour  node 2 #]) at every entry, i.e. the central node to the straight, and the two other nodes at the end of the edges
+        singles : list
+            a nested list containing [edge 1 #, central node #] at every entry, i.e. the edge in a degree one node and the node
+        single_neighbour_nodes : list
+            a nested list containing np.array([central node #, neighbour  node 1 #]) at every entry, i.e. the central node to the degree 1 node, and the other node at the end of the edge
+        IUB_matrix_idx : list
+            a list containing the index of the IUB entries in the matrix (i.e. fullmatrix_size[IUB:])
+        IUB_nodes :
+            a list containing the index of the IUB nodes [node for node in nodes if node is IUB]
         """
         self.read_polydata(polydata_path)
-        self.iolets = [[n, p] for n, p in zip(BC_nodes, BC_p)]
-        self.create_h_inlets(BC_haematocrit, BC_nodes)
+        self.unknown_BC_nodes = unknown_BC_nodes
+        self.iolets = [[n, p] for n, p in zip(known_BC_nodes, known_BC_p)]
+        self.create_h_inlets(BC_haematocrit, all_boundary_nodes)
         self.process_inlets()
-        self.bifurcations, self.bifurcation_neighbour_nodes, self.straights, self.straight_neighbour_nodes = poiseuille_network_functions.process_network(self.edges, self.nodes)
+        self.bifurcations, self.bifurcation_neighbour_nodes, self.straights, self.straight_neighbour_nodes, self.singles, self.single_neighbour_nodes = poiseuille_network_functions.process_network(self.edges, self.nodes)
+        self.create_IUB(unknown_BC_nodes)
 
     def read_polydata(self, polydata_path):
         reader = vtk.vtkXMLPolyDataReader()
@@ -135,6 +149,23 @@ process_inlets(self)
             self.H.append(0.0)
         for input_h in self.h_inlets:
             self.H[input_h[0]] = input_h[1]
+        return
+
+    def create_IUB(self, unknown_nodes):
+        matrix_length = len(self.nodes) + len(self.nodes) - len(unknown_nodes)
+        self.IUB_matrix_idx = []
+        self.IUB_nodes = []
+        self.unknown_nodes = unknown_nodes
+        idx_start = len(self.nodes)
+        for node in self.nodes:
+            node_idx = node[0]
+            if node_idx not in unknown_nodes:
+                self.IUB_nodes.append(node_idx)
+                self.IUB_matrix_idx.append(idx_start)
+                idx_start += 1
+        assert matrix_length == len(self.nodes) + len(self.IUB_nodes), (matrix_length, len(self.nodes), len(self.IUB_nodes))
+        assert matrix_length - 1 == self.IUB_matrix_idx[-1], (matrix_length - 1, self.IUB_matrix_idx[-1])
+        assert len(self.IUB_matrix_idx) == len(self.IUB_nodes), (len(self.IUB_matrix_idx), len(self.IUB_nodes))
         return
 
 
